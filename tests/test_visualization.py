@@ -10,12 +10,12 @@ class TestVisualization(unittest.TestCase):
     def setUp(self):
         """Set up test data."""
         self.analysis_df = pd.DataFrame({
-            'Discipline': ['QA', 'TA'],
-            'Original Estimate (Total)': [5.0, 6.0],
-            'AI Estimate (Total)': [4.0, 5.0],
-            'Actual Time (Total)': [4.6, 5.5],
+            'Discipline': ['QA', 'TA', 'FE', 'BE', 'BA'],
+            'Original Estimate (Total)': [5.0, 6.0, 7.0, 8.0, 4.0],
+            'AI Estimate (Total)': [4.0, 5.0, 6.0, 7.0, 3.0],
+            'Actual Time (Total)': [4.6, 5.5, 6.5, 7.5, 3.5],
         })
-        self.disciplines = ['QA', 'TA']
+        self.disciplines = ['QA', 'TA', 'FE', 'BE', 'BA']
 
     def test_create_comparison_plot(self):
         """Test plot creation."""
