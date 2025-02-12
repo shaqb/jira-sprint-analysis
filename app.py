@@ -5,7 +5,7 @@ import pandas as pd
 import os
 from datetime import datetime
 from io import BytesIO
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
@@ -48,13 +48,65 @@ try:
     # Display total unique tickets
     st.metric("Total Unique Tickets", len(df["Key"].unique()))
     
-    # Display column names for debugging
-    st.subheader("Available Columns")
-    st.write(list(df.columns))
+    # Create a table with Key, Summary, and Learnings grouped by discipline
+    st.subheader("Learnings by Discipline")
     
-    # Show data preview
-    st.subheader("Data Preview")
-    st.dataframe(df.head())
+    # Create tabs for each discipline
+    disciplines = ["TA", "BA", "QA", "BE Dev", "FE Dev"]
+    tabs = st.tabs(disciplines)
+    
+    for tab, discipline in zip(tabs, disciplines):
+        with tab:
+            # Filter for the specific discipline's learnings
+            discipline_col = f"{discipline} Learnings"
+            if discipline_col in df.columns:
+                discipline_data = df[["Key", "Summary", discipline_col]].copy()
+                
+                def is_valid_learning(x):
+                    if pd.isna(x):
+                        return False
+                    # Convert to string and lowercase
+                    x = str(x).lower().strip()
+                    # Check if empty or just whitespace
+                    if not x:
+                        return False
+                    # Check against invalid values
+                    invalid_values = {'0', '0.0', 'none', 'n/a', 'nan'}
+                    if x in invalid_values:
+                        return False
+                    # Check if it's any variation of zero (00.00, 0.0, etc)
+                    if x.replace('.', '').replace('0', '') == '':
+                        return False
+                    return True
+                
+                # Apply the filtering function
+                discipline_data = discipline_data[discipline_data[discipline_col].apply(is_valid_learning)]
+                
+                if not discipline_data.empty:
+                    st.dataframe(
+                        discipline_data,
+                        column_config={
+                            "Key": "Ticket Key",
+                            "Summary": st.column_config.TextColumn(
+                                "Ticket Summary",
+                                width="medium",
+                                help="The summary of the ticket",
+                                max_chars=50
+                            ),
+                            discipline_col: st.column_config.TextColumn(
+                                "Learnings",
+                                width="large",
+                                help="Learnings from this ticket",
+                                max_chars=None
+                            )
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+                else:
+                    st.info(f"No learnings found for {discipline}")
+            else:
+                st.warning(f"No learning column found for {discipline}")
     
     # Process button
     if st.button("Process Analysis"):
@@ -330,8 +382,60 @@ try:
                     ws_summary.column_dimensions['A'].width = 40
                     ws_summary.column_dimensions['B'].width = 10
                 
+                # Add Learnings sheets for each discipline
+                disciplines_with_learnings = ["QA", "TA", "FE Dev", "BE Dev", "BA"]
+                for discipline in disciplines_with_learnings:
+                    discipline_col = f"{discipline} Learnings"
+                    if discipline_col in df.columns:
+                        discipline_data = df[["Key", "Summary", discipline_col]].copy()
+                        
+                        # Apply the same filtering as in the display
+                        discipline_data = discipline_data[discipline_data[discipline_col].apply(is_valid_learning)]
+                        
+                        if not discipline_data.empty:
+                            # Create sheet for this discipline
+                            ws_discipline = wb.create_sheet(f"{discipline} Learnings")
+                            
+                            # Add title and explanation
+                            format_excel_cell(ws_discipline, "A1", f"{discipline} Learnings", bold=True)
+                            format_excel_cell(ws_discipline, "A2", f"Learnings from {discipline} tickets")
+                            
+                            # Rename the column for clarity
+                            discipline_data = discipline_data.rename(columns={discipline_col: "Learnings"})
+                            
+                            # Add headers
+                            headers = ["Key", "Summary", "Learnings"]
+                            for col, header in enumerate(headers, 1):
+                                format_excel_cell(ws_discipline, f"{chr(64+col)}4", header, bold=True)
+                            
+                            # Add data
+                            for r_idx, row in enumerate(dataframe_to_rows(discipline_data, index=False, header=False), 5):
+                                for c_idx, value in enumerate(row, 1):
+                                    cell = ws_discipline.cell(row=r_idx, column=c_idx, value=value)
+                                    # Enable text wrapping for Summary and Learnings
+                                    if c_idx in [2, 3]:  # Summary and Learnings columns
+                                        cell.alignment = Alignment(wrapText=True)
+                            
+                            # Adjust column widths
+                            ws_discipline.column_dimensions['A'].width = 15  # Key
+                            ws_discipline.column_dimensions['B'].width = 50  # Summary
+                            ws_discipline.column_dimensions['C'].width = 50  # Learnings
+                            
+                            # Add row height for better readability of wrapped text
+                            for row in ws_discipline.iter_rows(min_row=5):
+                                ws_discipline.row_dimensions[row[0].row].height = 45
+                
                 # Save Excel file
                 excel_path = os.path.join(output_dir, f"analysis_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+                wb.save(excel_path)
+                
+                # Add visualization as a new sheet
+                wb = load_workbook(excel_path)
+                ws_viz = wb.create_sheet("Visualization")
+                img = Image(img_bytes)
+                ws_viz.add_image(img, 'A1')
+                
+                # Resave with visualization
                 wb.save(excel_path)
                 
                 # Provide download link
@@ -342,8 +446,7 @@ try:
                         data=bytes_data,
                         file_name=os.path.basename(excel_path),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
+                    )                
             except Exception as e:
                 st.error(f"Error creating visualization or Excel report: {str(e)}")
                 
