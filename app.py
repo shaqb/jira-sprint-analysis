@@ -48,67 +48,6 @@ try:
     # Display total unique tickets
     st.metric("Total Unique Tickets", len(df["Key"].unique()))
     
-    # Create a table with Key, Summary, and Learnings grouped by discipline
-    st.subheader("Learnings by Discipline")
-    
-    # Create tabs for each discipline
-    disciplines = ["TA", "BA", "QA", "BE Dev", "FE Dev"]
-    tabs = st.tabs(disciplines)
-    
-    for tab, discipline in zip(tabs, disciplines):
-        with tab:
-            # Filter for the specific discipline's learnings
-            discipline_col = f"{discipline} Learnings"
-            if discipline_col in df.columns:
-                discipline_data = df[["Key", "Summary", discipline_col]].copy()
-                
-                def is_valid_learning(x):
-                    if pd.isna(x):
-                        return False
-                    # Convert to string and lowercase
-                    x = str(x).lower().strip()
-                    # Check if empty or just whitespace
-                    if not x:
-                        return False
-                    # Check against invalid values
-                    invalid_values = {'0', '0.0', 'none', 'n/a', 'nan'}
-                    if x in invalid_values:
-                        return False
-                    # Check if it's any variation of zero (00.00, 0.0, etc)
-                    if x.replace('.', '').replace('0', '') == '':
-                        return False
-                    return True
-                
-                # Apply the filtering function
-                discipline_data = discipline_data[discipline_data[discipline_col].apply(is_valid_learning)]
-                
-                if not discipline_data.empty:
-                    st.dataframe(
-                        discipline_data,
-                        column_config={
-                            "Key": "Ticket Key",
-                            "Summary": st.column_config.TextColumn(
-                                "Ticket Summary",
-                                width="medium",
-                                help="The summary of the ticket",
-                                max_chars=50
-                            ),
-                            discipline_col: st.column_config.TextColumn(
-                                "Learnings",
-                                width="large",
-                                help="Learnings from this ticket",
-                                max_chars=None
-                            )
-                        },
-                        hide_index=True,
-                        use_container_width=True
-                    )
-                else:
-                    st.info(f"No learnings found for {discipline}")
-            else:
-                st.warning(f"No learning column found for {discipline}")
-    
-    # Process button
     if st.button("Process Analysis"):
         with st.spinner("Processing data..."):
             # Ensure output directory exists
@@ -221,7 +160,7 @@ try:
                 })
                 
                 # Display the table
-                st.dataframe(display_df, use_container_width=True)
+                st.table(display_df)
                 
                 # Add explanation
                 st.write("""
@@ -253,12 +192,8 @@ try:
                     missing_df = missing_df.sort_values(["Discipline", "Ticket"])
                     
                     # Display with custom column order
-                    st.dataframe(
-                        missing_df[["Discipline", "Ticket", "Assignee", "Present Values", "Missing Fields"]],
-                        use_container_width=True
-                    )
+                    st.table(missing_df[["Discipline", "Ticket", "Assignee", "Present Values", "Missing Fields"]])
                     
-                    # Add explanation
                     st.write("""
                     This table shows tickets that have at least one non-zero value but are missing others:
                     - Each ticket shows the values that are present (excluding zeros)
@@ -270,8 +205,51 @@ try:
                     st.subheader("Missing Fields Summary")
                     missing_combos = missing_df.groupby("Missing Fields").size().reset_index(name="Count")
                     missing_combos = missing_combos.sort_values("Count", ascending=False)
-                    st.dataframe(missing_combos, use_container_width=True)
+                    st.table(missing_combos)
                     
+                # Display Learnings by Discipline last
+                st.subheader("Learnings by Discipline")
+                
+                # Create tabs for each discipline
+                disciplines = ["TA", "BA", "QA", "BE Dev", "FE Dev"]
+                tabs = st.tabs(disciplines)
+                
+                for tab, discipline in zip(tabs, disciplines):
+                    with tab:
+                        # Filter for the specific discipline's learnings
+                        discipline_col = f"{discipline} Learnings"
+                        if discipline_col in df.columns:
+                            discipline_data = df[["Key", "Summary", discipline_col]].copy()
+                            
+                            def is_valid_learning(x):
+                                if pd.isna(x):
+                                    return False
+                                # Convert to string and lowercase
+                                x = str(x).lower().strip()
+                                # Check if empty or just whitespace
+                                if not x:
+                                    return False
+                                # Check against invalid values
+                                invalid_values = {'0', '0.0', 'none', 'n/a', 'nan'}
+                                if x in invalid_values:
+                                    return False
+                                # Check if it's any variation of zero (00.00, 0.0, etc)
+                                if x.replace('.', '').replace('0', '') == '':
+                                    return False
+                                return True
+                            
+                            # Apply the filtering function
+                            discipline_data = discipline_data[discipline_data[discipline_col].apply(is_valid_learning)]
+                            
+                            if not discipline_data.empty:
+                                # Convert dataframe to a format suitable for st.table
+                                table_data = discipline_data.copy()
+                                # Rename the discipline column to "Learnings"
+                                table_data.columns = ["Key", "Summary", "Learnings"]
+                                st.table(table_data)
+                            else:
+                                st.info(f"No learnings found for {discipline}")
+                
                 # Save plot for Excel
                 img_bytes = BytesIO()
                 fig.savefig(img_bytes, format='png', bbox_inches="tight", dpi=300)
