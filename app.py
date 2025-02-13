@@ -45,8 +45,11 @@ try:
     # Filter out rows with blank or NaN keys
     df = df[df["Key"].notna() & (df["Key"] != "")]
     
+    # Filter by status (done, closed, accepted)
+    df = df[df["Status"].str.lower().isin(["done", "closed", "accepted"])]
+    
     # Display total unique tickets
-    st.metric("Total Unique Tickets", len(df["Key"].unique()))
+    st.metric("Total Unique Completed Tickets", len(df["Key"].unique()))
     
     if st.button("Process Analysis"):
         with st.spinner("Processing data..."):
@@ -174,7 +177,7 @@ try:
                 
                 # Display missing data details if any exist
                 if all_missing_data:
-                    st.subheader("Tickets with Incomplete Data")
+                    st.subheader("Incomplete Data in Completed Tickets")
                     missing_df = pd.DataFrame(all_missing_data)
                     
                     # Format the values as a readable string
@@ -195,14 +198,14 @@ try:
                     st.table(missing_df[["Discipline", "Ticket", "Assignee", "Present Values", "Missing Fields"]])
                     
                     st.write("""
-                    This table shows tickets that have at least one non-zero value but are missing others:
-                    - Each ticket shows the values that are present (excluding zeros)
-                    - Missing fields include both null values and zeros
+                    This table shows completed tickets (status: Done, Closed, or Accepted) that have missing data:
+                    - Each ticket shows the values that are present
+                    - Missing fields are those with null/blank values
                     - Fields can be: Original Estimate, AI Estimate, or Actual Time
                     """)
                     
                     # Group by missing field combinations
-                    st.subheader("Missing Fields Summary")
+                    st.subheader("Missing Fields Summary (Completed Tickets)")
                     missing_combos = missing_df.groupby("Missing Fields").size().reset_index(name="Count")
                     missing_combos = missing_combos.sort_values("Count", ascending=False)
                     st.table(missing_combos)
@@ -284,8 +287,8 @@ try:
                     ws_missing = wb.create_sheet("Missing Data")
                     
                     # Add title
-                    format_excel_cell(ws_missing, "A1", "Tickets with Incomplete Data", bold=True)
-                    format_excel_cell(ws_missing, "A2", "Shows tickets that have some fields populated but are missing others")
+                    format_excel_cell(ws_missing, "A1", "Incomplete Data in Completed Tickets", bold=True)
+                    format_excel_cell(ws_missing, "A2", "Shows completed tickets (status: Done, Closed, or Accepted) that have missing data")
                     
                     # Add missing data
                     missing_df = pd.DataFrame(all_missing_data)
@@ -340,8 +343,8 @@ try:
                     
                     # Add Missing Fields Summary sheet
                     ws_summary = wb.create_sheet("Missing Fields Summary")
-                    format_excel_cell(ws_summary, "A1", "Missing Fields Summary", bold=True)
-                    format_excel_cell(ws_summary, "A2", "Count of tickets by missing field combinations")
+                    format_excel_cell(ws_summary, "A1", "Missing Fields Summary (Completed Tickets)", bold=True)
+                    format_excel_cell(ws_summary, "A2", "Count of completed tickets by missing field combinations")
                     
                     # Create summary table
                     missing_combos = missing_df.groupby("Missing Fields").size().reset_index(name="Count")

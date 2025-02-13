@@ -14,9 +14,9 @@ def calculate_percentage_diff(original: float, actual: float) -> float:
     Returns:
         float: Percentage difference
     """
-    if pd.isna(original) or pd.isna(actual) or original == 0:
+    if pd.isna(original) or pd.isna(actual):
         return 0
-    return ((actual - original) / original) * 100
+    return ((actual - original) / original) * 100 if original != 0 else 0
 
 def calculate_improvement(original_total: float, ai_total: float, actual_total: float) -> Dict[str, float]:
     """Calculate percentage improvements in estimation accuracy.
@@ -96,12 +96,12 @@ def process_discipline_data(df: pd.DataFrame, discipline_mapping: Dict[str, str]
         ai_col = discipline_mapping["ai"]
         actual_col = discipline_mapping["actual"]
 
-        # Consider a value present only if it's not null and not zero
-        has_original = pd.notna(row[original_col]) and float(row[original_col]) > 0
-        has_ai = pd.notna(row[ai_col]) and float(row[ai_col]) > 0
-        has_actual = pd.notna(row[actual_col]) and float(row[actual_col]) > 0
+        # Consider a value present only if it's not null
+        has_original = pd.notna(row[original_col])
+        has_ai = pd.notna(row[ai_col])
+        has_actual = pd.notna(row[actual_col])
         
-        # Track any ticket that has at least one non-zero field populated
+        # Track any ticket that has at least one field populated
         if has_original or has_ai or has_actual:
             if has_original and has_ai and has_actual:
                 complete_tickets.add(row["Key"])
@@ -117,27 +117,24 @@ def process_discipline_data(df: pd.DataFrame, discipline_mapping: Dict[str, str]
                     missing_fields.append("Original Estimate")
                 else:
                     value = float(row[original_col])
-                    if value > 0:
-                        present_fields.append("Original Estimate")
-                        values["Original Estimate"] = value
+                    present_fields.append("Original Estimate")
+                    values["Original Estimate"] = value
                     
                 # Check AI estimate
                 if not has_ai:
                     missing_fields.append("AI Estimate")
                 else:
                     value = float(row[ai_col])
-                    if value > 0:
-                        present_fields.append("AI Estimate")
-                        values["AI Estimate"] = value
+                    present_fields.append("AI Estimate")
+                    values["AI Estimate"] = value
                     
                 # Check actual time
                 if not has_actual:
                     missing_fields.append("Actual Time")
                 else:
                     value = float(row[actual_col])
-                    if value > 0:
-                        present_fields.append("Actual Time")
-                        values["Actual Time"] = value
+                    present_fields.append("Actual Time")
+                    values["Actual Time"] = value
                 
                 # Only add to missing data details if we have at least one non-zero value
                 if values:
